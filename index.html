@@ -427,7 +427,7 @@
 </div>
 
 <!-- 현재 사용 중인 카카오 JavaScript 키로 교체하세요. -->
-<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=bbb0ccfb76d663f66a13288f9d9f8ff5"></script>
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=YOUR_KAKAO_JAVASCRIPT_KEY"></script>
 
 <!-- 업로드할 때 파일명을 stores.js 로 바꿔 사용하세요. -->
 <script src="./stores.js"></script>
@@ -546,7 +546,6 @@
 
     buildFilters();
     buildLegend();
-    distanceSortButton.disabled = true;
     updateSortButtons();
     applyFilters();
 
@@ -562,19 +561,106 @@
     });
 
     distanceSortButton.addEventListener('click', function () {
-        if (!currentLocationPosition) {
-            alert('가까운 순 정렬을 사용하려면 먼저 "내 위치" 버튼을 눌러 현재 위치를 확인해 주세요.');
+        if (currentLocationPosition) {
+            sortMode = 'distance';
+            updateSortButtons();
+            applyFilters();
             return;
         }
 
-        sortMode = 'distance';
-        updateSortButtons();
-        applyFilters();
+        requestCurrentLocationForDistanceSort();
     });
 
     kakao.maps.event.addListener(map, 'click', function () {
         closeInfoWindow();
     });
+
+    function requestCurrentLocationForDistanceSort() {
+        if (!navigator.geolocation) {
+            alert('이 브라우저에서는 위치정보 기능을 사용할 수 없습니다.');
+            return;
+        }
+
+        distanceSortButton.disabled = true;
+        distanceSortButton.textContent = '위치 확인 중...';
+
+        navigator.geolocation.getCurrentPosition(
+            function (position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+
+                currentLocationPosition = new kakao.maps.LatLng(lat, lng);
+
+                updateCurrentLocationMarker(lat, lng);
+
+                storeMapItems.forEach((entry) => {
+                    entry.distanceMeters = calculateDistanceMeters(
+                        lat,
+                        lng,
+                        entry.store.lat,
+                        entry.store.lng
+                    );
+                });
+
+                sortMode = 'distance';
+                updateSortButtons();
+                applyFilters();
+
+                distanceSortButton.disabled = false;
+                distanceSortButton.textContent = '가까운 순';
+            },
+            function (error) {
+                distanceSortButton.disabled = false;
+                distanceSortButton.textContent = '가까운 순';
+
+                let message = '가까운 순 정렬을 사용하려면 위치 정보를 확인해야 합니다.';
+
+                if (error.code === 1) {
+                    message = '가까운 순 정렬을 사용하려면 브라우저의 위치 권한을 허용해 주세요.';
+                } else if (error.code === 2) {
+                    message = '현재 위치 정보를 가져올 수 없습니다. 잠시 후 다시 시도해 주세요.';
+                } else if (error.code === 3) {
+                    message = '위치 확인 시간이 초과되었습니다. 다시 시도해 주세요.';
+                }
+
+                alert(message);
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 30000
+            }
+        );
+    }
+
+    function updateCurrentLocationMarker(lat, lng) {
+        currentLocationPosition = new kakao.maps.LatLng(lat, lng);
+
+        if (currentLocationOverlay) {
+            currentLocationOverlay.setMap(null);
+        }
+
+        const content = `
+            <div style="
+                width:22px;
+                height:22px;
+                border-radius:50%;
+                background:#2F80ED;
+                border:4px solid #ffffff;
+                box-shadow:0 1px 6px rgba(0,0,0,.35);
+            " title="내 위치"></div>
+        `;
+
+        currentLocationOverlay = new kakao.maps.CustomOverlay({
+            position: currentLocationPosition,
+            content: content,
+            xAnchor: 0.5,
+            yAnchor: 0.5,
+            zIndex: 50
+        });
+
+        currentLocationOverlay.setMap(map);
+    }
 
     function moveToCurrentLocation() {
         if (!navigator.geolocation) {
@@ -590,32 +676,7 @@
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
 
-                currentLocationPosition = new kakao.maps.LatLng(lat, lng);
-
-                if (currentLocationOverlay) {
-                    currentLocationOverlay.setMap(null);
-                }
-
-                const content = `
-                    <div style="
-                        width:22px;
-                        height:22px;
-                        border-radius:50%;
-                        background:#2F80ED;
-                        border:4px solid #ffffff;
-                        box-shadow:0 1px 6px rgba(0,0,0,.35);
-                    " title="내 위치"></div>
-                `;
-
-                currentLocationOverlay = new kakao.maps.CustomOverlay({
-                    position: currentLocationPosition,
-                    content: content,
-                    xAnchor: 0.5,
-                    yAnchor: 0.5,
-                    zIndex: 50
-                });
-
-                currentLocationOverlay.setMap(map);
+                updateCurrentLocationMarker(lat, lng);
 
                 map.setLevel(4);
                 map.panTo(currentLocationPosition);
@@ -628,8 +689,6 @@
                         entry.store.lng
                     );
                 });
-
-                distanceSortButton.disabled = false;
 
                 if (sortMode === 'distance') {
                     applyFilters();
