@@ -161,6 +161,14 @@
             map.setBounds(bounds);
         }
 
+        // 지도 빈 곳을 클릭하면 열려 있는 팝업 닫기
+        kakao.maps.event.addListener(map, 'click', function () {
+            if (openedInfoWindow) {
+                openedInfoWindow.close();
+                openedInfoWindow = null;
+            }
+        });
+
         function escapeHtml(text) {
             return String(text)
                 .replaceAll('&', '&amp;')
