@@ -20,8 +20,8 @@
         }
 
         .info-window {
-            min-width: 210px;
-            padding: 10px 12px;
+            min-width: 235px;
+            padding: 12px 14px;
             line-height: 1.45;
             font-size: 13px;
         }
@@ -33,7 +33,34 @@
         }
 
         .info-window .address {
+            margin-bottom: 10px;
             color: #555;
+            word-break: keep-all;
+        }
+
+        .info-window .buttons {
+            display: flex;
+            gap: 6px;
+        }
+
+        .info-window .map-button {
+            display: inline-block;
+            flex: 1;
+            box-sizing: border-box;
+            padding: 7px 8px;
+            border: 1px solid #d5d5d5;
+            border-radius: 5px;
+            background: #fff;
+            color: #222;
+            text-align: center;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .info-window .map-button:hover {
+            background: #f5f5f5;
         }
     </style>
 </head>
@@ -41,17 +68,20 @@
 <body>
     <div id="map"></div>
 
-    <!-- 아래 YOUR_KAKAO_JAVASCRIPT_KEY 부분을 본인의 JavaScript 키로 바꾸세요. -->
+    <!--
+      IMPORTANT:
+      아래 YOUR_KAKAO_JAVASCRIPT_KEY 부분을
+      현재 사용 중인 본인의 카카오 JavaScript 키로 바꾸세요.
+    -->
     <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=bbb0ccfb76d663f66a13288f9d9f8ff5"></script>
 
-    <!-- 가맹점 데이터 -->
     <script src="./stores.js"></script>
 
     <script>
         const container = document.getElementById('map');
 
         const options = {
-            center: new kakao.maps.LatLng(35.9802259, 127.6930799),
+            center: new kakao.maps.LatLng(36.0068, 127.6608),
             level: 9
         };
 
@@ -71,16 +101,44 @@
             const safeName = escapeHtml(store.name);
             const safeAddress = escapeHtml(store.address);
 
+            // Kakao Map 공식 링크 형식
+            const encodedName = encodeURIComponent(store.name);
+            const mapUrl =
+                `https://map.kakao.com/link/map/${encodedName},${store.lat},${store.lng}`;
+
+            const routeUrl =
+                `https://map.kakao.com/link/to/${encodedName},${store.lat},${store.lng}`;
+
             const infoWindow = new kakao.maps.InfoWindow({
                 content: `
                     <div class="info-window">
                         <strong>${safeName}</strong>
                         <div class="address">${safeAddress}</div>
+
+                        <div class="buttons">
+                            <a
+                                class="map-button"
+                                href="${mapUrl}"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                카카오맵에서 보기
+                            </a>
+
+                            <a
+                                class="map-button"
+                                href="${routeUrl}"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                길찾기
+                            </a>
+                        </div>
                     </div>
                 `
             });
 
-            kakao.maps.event.addListener(marker, 'click', function() {
+            kakao.maps.event.addListener(marker, 'click', function () {
                 if (openedInfoWindow) {
                     openedInfoWindow.close();
                 }
