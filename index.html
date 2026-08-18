@@ -189,6 +189,42 @@
             color: #fff;
         }
 
+        .sort-controls {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding-top: 10px;
+        }
+
+        .sort-label {
+            color: #666;
+            font-size: 12px;
+            font-weight: 700;
+            margin-right: 2px;
+        }
+
+        .sort-button {
+            border: 1px solid #dcdcdc;
+            border-radius: 999px;
+            background: #fff;
+            padding: 6px 10px;
+            color: #444;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .sort-button.active {
+            background: #222;
+            border-color: #222;
+            color: #fff;
+        }
+
+        .sort-button:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
+
         .store-list {
             flex: 1;
             overflow-y: auto;
@@ -231,6 +267,13 @@
             line-height: 1.5;
             word-break: keep-all;
             overflow-wrap: break-word;
+        }
+
+        .store-item-distance {
+            margin-top: 5px;
+            color: #2F80ED;
+            font-size: 12px;
+            font-weight: 700;
         }
 
         .empty-message {
@@ -371,6 +414,12 @@
             >
 
             <div id="categoryFilters" class="category-filters"></div>
+
+            <div class="sort-controls">
+                <span class="sort-label">정렬</span>
+                <button id="defaultSortButton" class="sort-button active" type="button">기본순</button>
+                <button id="distanceSortButton" class="sort-button" type="button">가까운 순</button>
+            </div>
         </div>
 
         <div id="storeList" class="store-list"></div>
@@ -406,6 +455,7 @@
     const bounds = new kakao.maps.LatLngBounds();
     let openedInfoWindow = null;
     let activeCategory = '전체';
+    let sortMode = 'default';
 
     const storePanel = document.getElementById('storePanel');
     const listToggle = document.getElementById('listToggle');
@@ -416,6 +466,8 @@
     const panelCount = document.getElementById('panelCount');
     const categoryFilters = document.getElementById('categoryFilters');
     const legend = document.getElementById('legend');
+    const defaultSortButton = document.getElementById('defaultSortButton');
+    const distanceSortButton = document.getElementById('distanceSortButton');
 
     const storeMapItems = [];
 
@@ -494,12 +546,31 @@
 
     buildFilters();
     buildLegend();
+    distanceSortButton.disabled = true;
+    updateSortButtons();
     applyFilters();
 
     listToggle.addEventListener('click', openPanel);
     locationButton.addEventListener('click', moveToCurrentLocation);
     panelClose.addEventListener('click', closePanel);
     storeSearch.addEventListener('input', applyFilters);
+
+    defaultSortButton.addEventListener('click', function () {
+        sortMode = 'default';
+        updateSortButtons();
+        applyFilters();
+    });
+
+    distanceSortButton.addEventListener('click', function () {
+        if (!currentLocationPosition) {
+            alert('가까운 순 정렬을 사용하려면 먼저 "내 위치" 버튼을 눌러 현재 위치를 확인해 주세요.');
+            return;
+        }
+
+        sortMode = 'distance';
+        updateSortButtons();
+        applyFilters();
+    });
 
     kakao.maps.event.addListener(map, 'click', function () {
         closeInfoWindow();
@@ -548,6 +619,21 @@
 
                 map.setLevel(4);
                 map.panTo(currentLocationPosition);
+
+                storeMapItems.forEach((entry) => {
+                    entry.distanceMeters = calculateDistanceMeters(
+                        lat,
+                        lng,
+                        entry.store.lat,
+                        entry.store.lng
+                    );
+                });
+
+                distanceSortButton.disabled = false;
+
+                if (sortMode === 'distance') {
+                    applyFilters();
+                }
 
                 locationButton.disabled = false;
                 locationButton.textContent = '내 위치';
@@ -635,7 +721,7 @@
     function applyFilters() {
         const keyword = storeSearch.value.trim().toLowerCase();
 
-        const visibleEntries = storeMapItems.filter((entry) => {
+        let visibleEntries = storeMapItems.filter((entry) => {
             const categoryMatch =
                 activeCategory === '전체' ||
                 entry.store.category === activeCategory;
@@ -645,6 +731,14 @@
 
             return categoryMatch && keywordMatch;
         });
+
+        if (sortMode === 'distance' && currentLocationPosition) {
+            visibleEntries = [...visibleEntries].sort((a, b) => {
+                const aDistance = Number.isFinite(a.distanceMeters) ? a.distanceMeters : Infinity;
+                const bDistance = Number.isFinite(b.distanceMeters) ? b.distanceMeters : Infinity;
+                return aDistance - bDistance;
+            });
+        }
 
         const visibleSet = new Set(visibleEntries);
 
@@ -687,6 +781,11 @@
                 <div class="store-item-address">
                     ${escapeHtml(store.address)}
                 </div>
+                ${
+                    Number.isFinite(entry.distanceMeters)
+                        ? `<div class="store-item-distance">${formatDistance(entry.distanceMeters)}</div>`
+                        : ''
+                }
             `;
 
             item.addEventListener('click', function () {
@@ -742,6 +841,40 @@
         };
 
         return new kakao.maps.MarkerImage(src, size, options);
+    }
+
+    function updateSortButtons() {
+        defaultSortButton.classList.toggle('active', sortMode === 'default');
+        distanceSortButton.classList.toggle('active', sortMode === 'distance');
+    }
+
+    function calculateDistanceMeters(lat1, lng1, lat2, lng2) {
+        const earthRadius = 6371000;
+        const toRadians = (degrees) => degrees * Math.PI / 180;
+
+        const phi1 = toRadians(lat1);
+        const phi2 = toRadians(lat2);
+        const deltaPhi = toRadians(lat2 - lat1);
+        const deltaLambda = toRadians(lng2 - lng1);
+
+        const a =
+            Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+            Math.cos(phi1) * Math.cos(phi2) *
+            Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return earthRadius * c;
+    }
+
+    function formatDistance(meters) {
+        if (!Number.isFinite(meters)) return '';
+
+        if (meters < 1000) {
+            return `약 ${Math.max(10, Math.round(meters / 10) * 10)}m`;
+        }
+
+        return `약 ${(meters / 1000).toFixed(1)}km`;
     }
 
     function openStore(marker, infoWindow) {
