@@ -134,7 +134,7 @@ const stores = [
     "category": "카페"
   },
   {
-    "name": "아름caf?",
+    "name": "아름cafe",
     "address": "전북특별자치도 무주군 무주읍 당산길 30-5",
     "lat": 36.00223046,
     "lng": 127.6687675,
