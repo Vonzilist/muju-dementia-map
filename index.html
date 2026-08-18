@@ -35,9 +35,12 @@
             top: 14px;
             left: 14px;
             z-index: 20;
+            display: flex;
+            gap: 8px;
         }
 
-        .list-toggle {
+        .list-toggle,
+        .location-button {
             border: 1px solid #d8d8d8;
             border-radius: 9px;
             background: #fff;
@@ -45,6 +48,11 @@
             font-weight: 700;
             cursor: pointer;
             box-shadow: 0 2px 8px rgba(0,0,0,.16);
+        }
+
+        .location-button:disabled {
+            cursor: wait;
+            opacity: .65;
         }
 
         /* ===== 범례 ===== */
@@ -291,7 +299,8 @@
                 left: 10px;
             }
 
-            .list-toggle {
+            .list-toggle,
+            .location-button {
                 padding: 9px 12px;
                 font-size: 13px;
             }
@@ -338,6 +347,7 @@
 
     <div class="top-controls">
         <button id="listToggle" class="list-toggle" type="button">가맹점 목록</button>
+        <button id="locationButton" class="location-button" type="button">내 위치</button>
     </div>
 
     <div id="legend" class="legend"></div>
@@ -399,6 +409,7 @@
 
     const storePanel = document.getElementById('storePanel');
     const listToggle = document.getElementById('listToggle');
+    const locationButton = document.getElementById('locationButton');
     const panelClose = document.getElementById('panelClose');
     const storeSearch = document.getElementById('storeSearch');
     const storeList = document.getElementById('storeList');
@@ -407,6 +418,9 @@
     const legend = document.getElementById('legend');
 
     const storeMapItems = [];
+
+    let currentLocationOverlay = null;
+    let currentLocationPosition = null;
 
     stores.forEach((store) => {
         const position = new kakao.maps.LatLng(store.lat, store.lng);
@@ -483,12 +497,84 @@
     applyFilters();
 
     listToggle.addEventListener('click', openPanel);
+    locationButton.addEventListener('click', moveToCurrentLocation);
     panelClose.addEventListener('click', closePanel);
     storeSearch.addEventListener('input', applyFilters);
 
     kakao.maps.event.addListener(map, 'click', function () {
         closeInfoWindow();
     });
+
+    function moveToCurrentLocation() {
+        if (!navigator.geolocation) {
+            alert('이 브라우저에서는 위치정보 기능을 사용할 수 없습니다.');
+            return;
+        }
+
+        locationButton.disabled = true;
+        locationButton.textContent = '위치 확인 중...';
+
+        navigator.geolocation.getCurrentPosition(
+            function (position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+
+                currentLocationPosition = new kakao.maps.LatLng(lat, lng);
+
+                if (currentLocationOverlay) {
+                    currentLocationOverlay.setMap(null);
+                }
+
+                const content = `
+                    <div style="
+                        width:22px;
+                        height:22px;
+                        border-radius:50%;
+                        background:#2F80ED;
+                        border:4px solid #ffffff;
+                        box-shadow:0 1px 6px rgba(0,0,0,.35);
+                    " title="내 위치"></div>
+                `;
+
+                currentLocationOverlay = new kakao.maps.CustomOverlay({
+                    position: currentLocationPosition,
+                    content: content,
+                    xAnchor: 0.5,
+                    yAnchor: 0.5,
+                    zIndex: 50
+                });
+
+                currentLocationOverlay.setMap(map);
+
+                map.setLevel(4);
+                map.panTo(currentLocationPosition);
+
+                locationButton.disabled = false;
+                locationButton.textContent = '내 위치';
+            },
+            function (error) {
+                locationButton.disabled = false;
+                locationButton.textContent = '내 위치';
+
+                let message = '현재 위치를 확인할 수 없습니다.';
+
+                if (error.code === 1) {
+                    message = '위치 권한이 거부되었습니다. 브라우저의 위치 권한을 허용한 뒤 다시 시도해 주세요.';
+                } else if (error.code === 2) {
+                    message = '현재 위치 정보를 가져올 수 없습니다.';
+                } else if (error.code === 3) {
+                    message = '위치 확인 시간이 초과되었습니다. 다시 시도해 주세요.';
+                }
+
+                alert(message);
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 30000
+            }
+        );
+    }
 
     function buildFilters() {
         const allButton = makeFilterButton('전체');
