@@ -29,6 +29,22 @@
             height: 100vh;
         }
 
+        .map-title {
+            position: absolute;
+            top: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            padding: 10px 16px;
+            border: 1px solid #d8d8d8;
+            border-radius: 10px;
+            background: rgba(255,255,255,.96);
+            box-shadow: 0 2px 8px rgba(0,0,0,.16);
+            font-size: 16px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
         /* ===== 지도 위 기본 UI ===== */
         .top-controls {
             position: absolute;
@@ -337,6 +353,13 @@
         .info-window .map-button:hover { background: #f5f5f5; }
 
         @media (max-width: 700px) {
+            .map-title {
+                top: 58px;
+                max-width: calc(100vw - 20px);
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+
             .top-controls {
                 top: 10px;
                 left: 10px;
@@ -387,6 +410,8 @@
 <body>
 <div id="app">
     <div id="map"></div>
+
+    <div class="map-title">무주군 치매안심가맹점 지도</div>
 
     <div class="top-controls">
         <button id="listToggle" class="list-toggle" type="button">가맹점 목록</button>
